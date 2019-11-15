@@ -40,7 +40,6 @@ k8s_cmd='oc'
 namespace='dittybopper'
 grafana_pass='admin'
 grafana_default_pass=True
-masters=($($k8s_cmd get nodes -l node-role.kubernetes.io/master -o name | awk -F / '{print $2}'))
 
 # Other vars
 deploy_template="templates/dittybopper.yaml.template"
@@ -84,6 +83,10 @@ while getopts ":c:m:n:p:i:dh" opt; do
       ;;
   esac
 done
+
+if [[ ! $masters ]]; then
+  masters=($($k8s_cmd get nodes -l node-role.kubernetes.io/master -o name | awk -F / '{print $2}'))
+fi
 
 echo -e "\033[32m
     ____  _ __  __        __
