@@ -107,9 +107,9 @@ fi
 #FIXME: This is OCP-Specific; needs updating to support k8s
 echo ""
 echo -e "\033[32mGetting environment vars...\033[0m"
-prom_url=$($k8s_cmd get secrets -n openshift-monitoring grafana-datasources -o go-template='{{index .data "prometheus.yaml"}}' | base64 --decode | jq '.datasources[0].url')
+prom_url=$($k8s_cmd get secrets -n openshift-monitoring grafana-datasources -o go-template='{{index .data "prometheus.yaml"}}' | base64 -d | jq '.datasources[0].url')
 prom_user="internal"
-prom_pass=$($k8s_cmd get secrets -n openshift-monitoring grafana-datasources -o go-template='{{index .data "prometheus.yaml"}}' | base64 --decode | jq '.datasources[0].basicAuthPassword')
+prom_pass=$($k8s_cmd get secrets -n openshift-monitoring grafana-datasources -o go-template='{{index .data "prometheus.yaml"}}' | base64 -d | jq '.datasources[0].basicAuthPassword')
 echo "Prometheus URL is: $prom_url"
 echo "Prometheus password collected."
 
