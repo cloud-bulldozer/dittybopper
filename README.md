@@ -20,6 +20,8 @@ templates will need adjustment accordingly. The default dashboard included via
 [arsenal/system-metrics-dashboards/grafana/master_nodes.json](https://github.com/cloud-bulldozer/arsenal/blob/master/system-metrics-dashboards/grafana/master_nodes.json)
 is currently designed for a 3-master OpenShift 4 deployment.
 
+The `deploy.sh` script also requires `jq` to be installed on the system it is being run from.
+
 ## Contribute
 
 Pull requests are encouraged. If you find this tool useful, please help extend it for more use cases.
