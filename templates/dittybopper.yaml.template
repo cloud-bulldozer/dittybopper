@@ -48,7 +48,7 @@ spec:
     spec:
       containers:
       - name: dittybopper
-        image: docker.io/grafana/grafana:master
+        image: docker.io/grafana/grafana:6.7.2
         ports:
         - name: sc-grafana-http
           containerPort: 3000
