@@ -167,12 +167,11 @@ function dashboard() {
       dashfile=$d
     fi
     echo "Importing dashboard $dashfile"
-    j=$(sed "s/master0/${masters[0]}/g; s/master1/${masters[1]}/g; s/master2/${masters[2]}/g" "${dashfile}")
-
-    curl -s -k -XPOST -H "Content-Type: application/json" -H "Accept: application/json" -d "{
-        \"dashboard\": $j,
-        \"overwrite\": true
-      }" "http://admin:${grafana_pass}@${dittybopper_route}/api/dashboards/db" >/dev/null 2>&1
+    sed -i "s/master0/${masters[0]}/g; s/master1/${masters[1]}/g; s/master2/${masters[2]}/g" "${dashfile}"
+    echo -e "{\"dashboard\": $(cat ${dashfile}),\"overwrite\": true}" > ${dashfile}
+    curl -s -k -XPOST -H "Content-Type: application/json" -H "Accept: application/json" \
+      -d "@${dashfile}" \
+      "http://admin:${grafana_pass}@${dittybopper_route}/api/dashboards/db" >/dev/null 2>&1
   done
 }
 
