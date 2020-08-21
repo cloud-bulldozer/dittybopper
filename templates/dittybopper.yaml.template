@@ -48,7 +48,7 @@ spec:
     spec:
       containers:
       - name: dittybopper
-        image: docker.io/grafana/grafana:6.7.2
+        image: docker.io/grafana/grafana:7.1.4
         ports:
         - name: sc-grafana-http
           containerPort: 3000
@@ -57,7 +57,11 @@ spec:
           name: sc-grafana-config
         - mountPath: /etc/grafana/provisioning/datasources
           name: sc-ocp-prom
-
+      - name: dittybopper-syncer
+        env:
+        - name: GRAFANA_ADMIN_PASSWORD
+          value: ${GRAFANA_ADMIN_PASSWORD}
+        image: quay.io/cloud-bulldozer/dittybopper-syncer:latest
       volumes:
       - name: sc-grafana-config
         configMap:
