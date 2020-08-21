@@ -7,7 +7,6 @@ Deploys a mutable grafana pod with default dashboards for monitoring
 system submetrics during workload/benchmark runs
 
 Usage: $(basename "${0}") [-c <kubectl_cmd>] [-n <namespace>] [-p <grafana_pwd>]
-                          [-m <master0>,<master1>,<master2>]
 
        $(basename "${0}") [-i <dash_path>]
 
@@ -20,9 +19,6 @@ Usage: $(basename "${0}") [-c <kubectl_cmd>] [-n <namespace>] [-p <grafana_pwd>]
 
   -p <grafana_pass> : The (p)assword to configure for the Grafana admin user
                       (defaults to 'admin')
-
-  -m <h>,<h>,<h>    : Comma-separated list of (m)aster node prometheus instances
-                      (overrides detected node names; expects 3 masters)
 
   -i <dash_path>    : (I)mport dashboard from given path. Using this flag will
                       bypass the deployment process and only do the import to an
@@ -44,16 +40,14 @@ grafana_default_pass=True
 
 # Other vars
 deploy_template="templates/dittybopper.yaml.template"
-dashboards=(https://raw.githubusercontent.com/cloud-bulldozer/arsenal/master/openshift-performance-dashboard/grafana/on-cluster-latest.json https://raw.githubusercontent.com/cloud-bulldozer/arsenal/master/system-metrics-dashboards/grafana/master_nodes.json https://raw.githubusercontent.com/cloud-bulldozer/arsenal/master/kube-cluster-dashboard/grafana/kube_cluster.json)
+arsenal="https://github.com/cloud-bulldozer/arsenal.git"
+dashboards=(arsenal/jsonnet/rendered/ocp-performance.json arsenal/jsonnet/rendered/api-performance-overview.json arsenal/jsonnet/rendered/etcd-on-cluster-dashboard.json)
 
 # Capture and act on command options
 while getopts ":c:m:n:p:i:dh" opt; do
   case ${opt} in
     c)
       k8s_cmd=${OPTARG}
-      ;;
-    m)
-      masters=("${OPTARG//,/ }")
       ;;
     n)
       namespace="${OPTARG}"
@@ -85,9 +79,6 @@ while getopts ":c:m:n:p:i:dh" opt; do
   esac
 done
 
-if [[ ! $masters ]]; then
-  masters=($($k8s_cmd get nodes -l node-role.kubernetes.io/master -o name | awk -F / '{print $2}'))
-fi
 
 echo -e "\033[32m
     ____  _ __  __        __
@@ -155,6 +146,8 @@ function grafana() {
 }
 
 function dashboard() {
+  git clone ${arsenal} --depth=1
+  make -C arsenal/jsonnet/ build
   dittybopper_route=$($k8s_cmd get routes -n "$namespace" -o=jsonpath='{.items[0].spec.host}')
   dashboards=("$@")
   for d in "${dashboards[@]}"; do
@@ -162,17 +155,20 @@ function dashboard() {
       echo "Fetching remote dashboard $d"
       dashfile="/tmp/$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 8)"
       wget -q $d -O $dashfile >/dev/null
+    elif [[ ! -f $d ]]; then
+      echo "Dashboard ${d} not found"
+      continue
     else
       echo "Using local dashboard $d"
       dashfile=$d
     fi
     echo "Importing dashboard $dashfile"
-    sed -i "s/master0/${masters[0]}/g; s/master1/${masters[1]}/g; s/master2/${masters[2]}/g" "${dashfile}"
-    echo -e "{\"dashboard\": $(cat ${dashfile}),\"overwrite\": true}" > ${dashfile}
-    curl -s -k -XPOST -H "Content-Type: application/json" -H "Accept: application/json" \
-      -d "@${dashfile}" \
-      "http://admin:${grafana_pass}@${dittybopper_route}/api/dashboards/db" >/dev/null 2>&1
+    dashboard=$(cat ${dashfile})
+    echo "{\"dashboard\": ${dashboard}, \"overwrite\": true}" | \
+      curl -Ss -k -XPOST -H "Content-Type: application/json" -H "Accept: application/json" -d@- \
+      "http://admin:${grafana_pass}@${dittybopper_route}/api/dashboards/db" -o /dev/null
   done
+  rm -Rf arsenal
 }
 
 if [[ $delete ]]; then
