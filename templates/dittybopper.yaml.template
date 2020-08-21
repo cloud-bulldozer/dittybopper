@@ -61,6 +61,8 @@ spec:
         env:
         - name: GRAFANA_ADMIN_PASSWORD
           value: ${GRAFANA_ADMIN_PASSWORD}
+        - name: DASHBOARDS
+          value: ${DASHBOARDS}
         image: quay.io/cloud-bulldozer/dittybopper-syncer:latest
       volumes:
       - name: sc-grafana-config

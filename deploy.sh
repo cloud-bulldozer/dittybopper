@@ -32,10 +32,15 @@ Usage: $(basename "${0}") [-c <kubectl_cmd>] [-n <namespace>] [-p <grafana_pwd>]
 END
 }
 
+# Set default template variables
+
+export PROMETHEUS_USER=internal
+export GRAFANA_ADMIN_PASSWORD=admin
+export DASHBOARDS="ocp-performance.json api-performance-overview.json etcd-on-cluster-dashboard.json"
+
 # Set defaults for command options
 k8s_cmd='oc'
 namespace='dittybopper'
-grafana_pass='admin'
 grafana_default_pass=True
 
 # Other vars
@@ -51,11 +56,11 @@ while getopts ":c:m:n:p:i:dh" opt; do
       namespace="${OPTARG}"
       ;;
     p)
-      grafana_pass=${OPTARG}
+      export GRAFANA_ADMIN_PASSWORD=${OPTARG}
       grafana_default_pass=False
       ;;
     i)
-      dash_import=("${OPTARG}")
+      dash_import+=(${OPTARG})
       ;;
     d)
       delete=True
@@ -78,6 +83,7 @@ while getopts ":c:m:n:p:i:dh" opt; do
 done
 
 
+      echo "${dash_import[@]}"
 echo -e "\033[32m
     ____  _ __  __        __
    / __ \(_) /_/ /___  __/ /_  ____  ____  ____  ___  _____
@@ -90,7 +96,7 @@ echo -e "\033[32m
 echo "Using k8s command: $k8s_cmd"
 echo "Using namespace: $namespace"
 if [[ ${grafana_default_pass} ]]; then
-  echo "Using default grafana password: $grafana_pass"
+  echo "Using default grafana password: ${GRAFANA_ADMIN_PASSWORD}"
 else
   echo "Using custom grafana password."
 fi
@@ -100,10 +106,9 @@ fi
 #FIXME: This is OCP-Specific; needs updating to support k8s
 echo ""
 echo -e "\033[32mGetting environment vars...\033[0m"
-prom_url=$($k8s_cmd get secrets -n openshift-monitoring grafana-datasources -o go-template='{{index .data "prometheus.yaml" | base64decode }}' | jq '.datasources[0].url')
-prom_user="internal"
-prom_pass=$($k8s_cmd get secrets -n openshift-monitoring grafana-datasources -o go-template='{{index .data "prometheus.yaml"| base64decode }}' | jq '.datasources[0].basicAuthPassword')
-echo "Prometheus URL is: $prom_url"
+export PROMETHEUS_URL=$($k8s_cmd get secrets -n openshift-monitoring grafana-datasources -o go-template='{{index .data "prometheus.yaml" | base64decode }}' | jq '.datasources[0].url')
+export PROMETHEUS_PASSWORD=$($k8s_cmd get secrets -n openshift-monitoring grafana-datasources -o go-template='{{index .data "prometheus.yaml"| base64decode }}' | jq '.datasources[0].basicAuthPassword')
+echo "Prometheus URL is: ${PROMETHEUS_URL}"
 echo "Prometheus password collected."
 
 function namespace() {
@@ -112,8 +117,7 @@ function namespace() {
 }
 
 function grafana() {
-  sed -e "s;\${GRAFANA_ADMIN_PASSWORD};${grafana_pass};g" -e "s;\${PROMETHEUS_URL};${prom_url};g" -e "s;\${PROMETHEUS_USER};${prom_user};g" -e "s;\${PROMETHEUS_PASSWORD};${prom_pass};g" $deploy_template | $k8s_cmd "$1" -f -
-
+  envsubst < ${deploy_template} | $k8s_cmd "$1" -f -
   if [[ ! $delete ]]; then
     echo ""
     echo -e "\033[32mWaiting for dittybopper deployment to be available...\033[0m"
@@ -122,18 +126,21 @@ function grafana() {
 }
 
 function dash_import(){
-  if [[ $dash_import =~ ^http ]]; then
-    echo "Fetching remote dashboard $d"
-    dashfile="/tmp/$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 8)"
-    curl -sS $dash_import -o $dashfile
-  else
-    echo "Using local dashboard ${dash_import}"
-    dashfile=$dash_import
-  fi
-  dashboard=$(cat ${dashfile})
-  echo "{\"dashboard\": ${dashboard}, \"overwrite\": true}" | \
-  curl -Ss -XPOST -H "Content-Type: application/json" -H "Accept: application/json" -d@- \
-  "http://admin:${grafana_pass}@${dittybopper_route}/api/dashboards/db" -o /dev/null
+  echo -e "\033[32mImporting dashboards...\033[0m"
+  for dash in ${dash_import[@]}; do
+    if [[ $dash =~ ^http ]]; then
+      echo "Fetching remote dashboard $dash"
+      dashfile="/tmp/$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 8)"
+      curl -sS $dash -o $dashfile
+    else
+      echo "Using local dashboard ${dash}"
+      dashfile=$dash
+    fi
+    dashboard=$(cat ${dashfile})
+    echo "{\"dashboard\": ${dashboard}, \"overwrite\": true}" | \
+    curl -Ss -XPOST -H "Content-Type: application/json" -H "Accept: application/json" -d@- \
+    "http://admin:${GRAFANA_ADMIN_PASSWORD}@${dittybopper_route}/api/dashboards/db" -o /dev/null
+  done
 }
 
 if [[ $delete ]]; then
@@ -154,8 +161,7 @@ else
   grafana "apply"
   echo ""
   dittybopper_route=$($k8s_cmd -n $namespace get route dittybopper  -o jsonpath="{.spec.host}")
-  echo -e "\033[32mDeployment complete!\033[0m"
   [[ ! -z ${dash_import} ]] && dash_import
-  dittybopper_route=$($k8s_cmd -n $namespace get route dittybopper  -o jsonpath="{.spec.host}")
+  echo ""
   echo "You can access the Grafana instance at http://${dittybopper_route}"
 fi

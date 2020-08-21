@@ -1,7 +1,6 @@
 #!/bin/bash
 
 arsenal=https://github.com/cloud-bulldozer/arsenal.git
-dashboards="ocp-performance.json api-performance-overview.json etcd-on-cluster-dashboard.json"
 
 git clone ${arsenal} --depth=1
 make -C arsenal/jsonnet build
@@ -11,7 +10,7 @@ while [[ $(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/heal
   sleep 5
 done
 
-for d in ${dashboards}; do
+for d in ${DASHBOARDS}; do
   if [[ ! -f $d ]]; then
     echo "Dashboard ${d} not found"
     continue
