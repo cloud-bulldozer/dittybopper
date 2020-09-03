@@ -33,7 +33,7 @@ Pull requests are encouraged. If you find this tool useful, please help extend i
 ```
 $ git clone https://github.com/cloud-bulldozer/dittybopper.git
 $ cd dittybopper
-$ ./deploy.sh [-c <kubectl_cmd>] [-m <host1> <host2> <host3>] [-n <namespace>] [-p <grafana_pwd>]
+$ ./deploy.sh [-c <kubectl_cmd>] [-n <namespace>] [-p <grafana_pwd>]
 ```
 
 See `./deploy.sh -h` for help.
